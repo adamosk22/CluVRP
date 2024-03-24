@@ -27,7 +27,6 @@ def tsp_nearest_neighbor(coordinates, number):
     num_nodes = len(coordinates)
     visited = [False] * num_nodes
 
-    # Wybierz losowy punkt początkowy
     start_node = 0
     visited[start_node] = True
     current_node = start_node
@@ -92,7 +91,6 @@ def tsp_nearest_neighbor_global(coordinates):
         visited[nearest_neighbor] = True
         current_node = nearest_neighbor
 
-    # Dodaj odległość powrotną do punktu początkowego
     last_node = path[-1]
     distance_to_start = calculate_distance(coordinates[last_node][0], coordinates[start_node][0])
     total_distance += distance_to_start
