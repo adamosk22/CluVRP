@@ -91,47 +91,74 @@ def allocate_clusters_to_vehicle(clusters_data, vehicle_capacity):
             new_vehicle = {'clusters': [cluster['ClusterID']], 'remaining_capacity': vehicle_capacity - cluster_demand}
             vehicles.append(new_vehicle)
 
+    for vehicle in vehicles:
+        vehicle['clusters'].append(0)
+        vehicle['clusters'].insert(0,0)
+
     return vehicles
 
 def calculate_route_cost(clusters_data, inter_cluster_distances):
     # Przykładowa funkcja obliczająca koszt trasy na podstawie danych klastrów
     total_cost = 0
     for i in range(len(clusters_data) - 1):
-        print('test')
-        print(clusters_data)
-        clustersDict = clusters_data[1]
-        print(type(clustersDict))
-        print(clustersDict)
-        clusters = clustersDict['clusters']
-        cluster1 = clusters[i]
-        cluster2 = clusters[i + 1]
+        cluster1 = clusters_data[i]
+        cluster2 = clusters_data[i + 1]
         total_cost += inter_cluster_distances[cluster1][cluster2]
-        print(total_cost)
     return total_cost
 
 def intra_swap(clusters_data):
+    clusters_data = clusters_data[1:-1]
     # Operator Swap: zamienia pozycje dwóch klastrów w trasie
     if len(clusters_data) >= 2:
         idx1, idx2 = random.sample(range(len(clusters_data)), 2)
         clusters_data[idx1], clusters_data[idx2] = clusters_data[idx2], clusters_data[idx1]
+    clusters.append(0)
+    clusters.insert(0,0)
 
 def intra_relocate(clusters_data):
+    clusters_data = clusters_data[1:-1]
     # Operator Relocate: usuwa jeden klaster i wstawia go w inne miejsce w trasie
     if len(clusters_data) >= 2:
         cluster = random.choice(clusters_data)
         clusters_data.remove(cluster)
         idx = random.randint(0, len(clusters_data))
         clusters_data.insert(idx, cluster)
+    clusters.append(0)
+    clusters.insert(0,0)
+
+def intra_two_opt(clusters_data):
+    clusters_data = clusters_data[1:-1]
+    # Operator Two-Opt: zamienia kolejność dwóch krawędzi w trasie
+    if len(clusters_data) >= 4:
+        idx1, idx2 = random.sample(range(len(clusters_data)), 2)
+        if idx1 > idx2:
+            idx1, idx2 = idx2, idx1
+        clusters_data[idx1:idx2+1] = reversed(clusters_data[idx1:idx2+1])
+    clusters.append(0)
+    clusters.insert(0,0)
+
+def intra_or_opt(clusters_data):
+    clusters_data = clusters_data[1:-1]
+    # Operator Or-Opt: usuwa N kolejnych klastrów i wstawia je w inne miejsce w trasie (N=2, 3, 4)
+    if len(clusters_data) >= 4:
+        N = random.choice([2, 3, 4])
+        idx = random.randint(0, len(clusters_data) - N)
+        clusters = clusters_data[idx:idx+N]
+        clusters_data[idx:idx+N] = []
+        new_idx = random.randint(0, len(clusters_data))
+        clusters_data[new_idx:new_idx] = clusters
+    clusters.append(0)
+    clusters.insert(0,0)
 
 def generate_random_order(neighbourhoods):
     # Generuj losową kolejność sprawdzania sąsiedztw
     random_order = random.sample(neighbourhoods, len(neighbourhoods))
     return random_order
 
-def vns_cluster_level(clusters, max_iterations, inter_cluster_distances):
-
+def vns_cluster_level(vehicle, max_iterations, inter_cluster_distances):
+    clusters = vehicle['clusters']
     # Ustalenie sąsiedztw i operacji
-    neighbourhoods = [intra_swap, intra_relocate]
+    neighbourhoods = [intra_swap, intra_relocate, intra_two_opt, intra_or_opt]
     best_clusters = clusters
     best_cost = calculate_route_cost(clusters, inter_cluster_distances)
     nIterationsNoImprovement = 0
@@ -158,10 +185,10 @@ def vns_cluster_level(clusters, max_iterations, inter_cluster_distances):
 nIterationsNoImprovement = 0
 goToNodeVNS = False
 stoppingCriterion = False
-maxIterationsNoImprovement = 100
+maxIterationsNoImprovement = 10
 cluVNSProb = 0.5
-S_star_i = None
-f_S_star_i = float('inf')
+best_clusters = None
+best_cost = float('inf')
 vehicle_capacity = 500
 counter = 0
 
@@ -184,13 +211,27 @@ for i, vehicle in enumerate(allocated_clusters, 1):
     #print("Initial Cost:", initial_cost)
 
 # Step 2: Intensification phase
-while counter==0:
+while (counter==0) or (stoppingCriterion == False):
     counter += 1
-    for vehicle in enumerate(allocated_clusters, 1):
-        best_clusters, best_cost = vns_cluster_level(vehicle, 100, inter_cluster_distances)
-        for cluster in best_clusters:
-            print(f"ClusterID: {cluster['ClusterID']}, Total Demand: {cluster['TotalDemand']}")
-        print("Best Cost:", best_cost)
+    calculated_clusters_list = list()
+    calcualted_cost_list = list()
+    for i, vehicle in enumerate(allocated_clusters, 1):
+        calculated_clusters, calculated_cost = vns_cluster_level(vehicle, 100, inter_cluster_distances)
+        calculated_clusters_list.append(calculated_clusters)
+        calcualted_cost_list.append(calculated_cost)
+        print("Vehicle", i, "Clusters order:", calculated_clusters)
+        print("Calculated Cost:", calculated_cost)
+    end_calculated_cost = max(calcualted_cost_list)
+    if(end_calculated_cost<best_cost):
+            best_cost = end_calculated_cost
+            nIterationsNoImprovement=0
+    else:
+        nIterationsNoImprovement += 1
+        print(nIterationsNoImprovement)
+    print("Best cost:", best_cost)
+    if nIterationsNoImprovement==maxIterationsNoImprovement:
+        stoppingCriterion=True
+        
 
 
 
