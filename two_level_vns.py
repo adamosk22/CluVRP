@@ -4,6 +4,7 @@ import sys
 import math
 import random
 import networkx as nx
+import time
 
 def extract_data_from_xml(xml_file):
     tree = ET.parse(xml_file)
@@ -329,7 +330,6 @@ def inter_swap_nodes(allocated_nodes):
             i = 0
             if len(indices1) == len(indices2):
                 for i, indice in enumerate(indices1):
-                    print(i)
                     vehicle_nodes[indices1[i]], vehicle_nodes[indices2[i]] = vehicle_nodes[indices2[i]], vehicle_nodes[indices1[i]]
         vehicle_number += 1
 
@@ -350,7 +350,6 @@ def inter_swap_nodes_vehicle(allocated_nodes):
             indices2 = [idx for idx, elem in enumerate(vehicle_nodes2) if elem['Cluster'] == cluster2]
             if len(indices1) == len(indices2):
                 for i, indice in enumerate(indices1):
-                    print(i)
                     vehicle_nodes1[indices1[i]], vehicle_nodes2[indices2[i]] = vehicle_nodes2[indices2[i]], vehicle_nodes1[indices1[i]]
 
     
@@ -387,8 +386,6 @@ def inter_relocate_nodes(allocated_nodes):
                 if allocated_nodes[vehicle_number][0]!=allocated_nodes[vehicle_number][-1]:
                     allocated_nodes[vehicle_number][-1]=allocated_nodes[vehicle_number][0]
                 while (allocated_nodes[vehicle_number][idx]['Cluster'] == allocated_nodes[vehicle_number][idx+1]['Cluster']) and (idx<len(allocated_nodes[vehicle_number])-1):
-                    print(idx)
-                    print(allocated_nodes[vehicle_number])
                     idx += 1
                 indices1 = [idx for idx, elem in enumerate(allocated_nodes[vehicle_number]) if elem['Cluster'] == cluster]
                 relocated_elements = []
@@ -410,8 +407,6 @@ def inter_relocate_nodes_vehicle(allocated_nodes):
             if(allocated_nodes[idx2][0]!=allocated_nodes[idx2][-1]):
                 allocated_nodes[idx2].append(allocated_nodes[idx2][0])
             while allocated_nodes[idx2][idx]["Cluster"] == allocated_nodes[idx2][idx+1]['Cluster']:
-                print(idx)
-                print(allocated_nodes[idx2])
                 if idx < len(allocated_nodes[idx2]) - 1:
                     idx += 1
             indices1 = [idx for idx, elem in enumerate(allocated_nodes[idx1]) if elem['Cluster'] == cluster]
@@ -521,6 +516,8 @@ def vns_customer_level(customer_sequence):
             neighbourhood(customer_sequence_copy)
             calculated_nodes_cost = []
             for vehicle in customer_sequence_copy:
+                if vehicle[0]!=vehicle[-1]:
+                    vehicle[-1] = vehicle[0]
                 calculated_nodes_cost.append(calculate_root_cost_nodes(vehicle))
             if max(best_nodes_cost)>max(calculated_nodes_cost):
                 best_nodes = customer_sequence_copy
@@ -561,6 +558,8 @@ def repair(allocated_clusters, deleted_clusters):
     
     return allocated_clusters
 
+start = time.time()
+
 # Stałe i zmienne
 nIterationsNoImprovement = 0
 goToNodeVNS = False
@@ -580,8 +579,6 @@ xml_file_path = 'dataset.xml'
 
 nodes = extract_data_from_xml(xml_file_path)
 inter_cluster_distances = calculate_inter_cluster_distances(nodes)
-for row in inter_cluster_distances:
-    print(row)
 cluster_nodes = create_nodes_clusters_table(nodes)
 cluster_tsp_paths = {}  # Słownik przechowujący optymalne trasy dla każdego klastra
 
@@ -597,11 +594,7 @@ for cluster_id, cluster_customers in cluster_nodes.items():
 
 # Step 1: Constructive phase
 clusters = create_clusters_table(nodes)
-for cluster in clusters:
-    print(cluster)
 allocated_clusters = allocate_clusters_to_vehicle(clusters, vehicle_capacity)
-for i, vehicle in enumerate(allocated_clusters, 1):
-    print(f"Vehicle {i}: {vehicle['clusters']} (Remaining Capacity: {vehicle['remaining_capacity']})")
 
 # Step 2: Intensification phase
 while (counter==0) or (stoppingCriterion == False):
@@ -611,25 +604,17 @@ while (counter==0) or (stoppingCriterion == False):
     while (goToNodeVNS == True) or (first_run_node == True):
         first_run_node = False
         i = 1
-        for vehicle in calculated_clusters:
-            print("Vehicle:", i, "Clusters order:", vehicle)
-            i += 1
-        print("Calculated Cost:", calculated_cost)
-        print(cluster_tsp_paths)
         customer_sequence = convert_cluster_to_customer_sequence(nodes, cluster_tsp_paths, calculated_clusters, 0.4)
         calculated_nodes, calculated_nodes_cost = vns_customer_level(customer_sequence)
         for vehicle in calculated_nodes:
             if vehicle[0]!=vehicle[-1]:
                 vehicle[-1] = vehicle[0]
-        print(customer_sequence)
-        print(calculated_clusters)
         if max(calculated_nodes_cost)<best_nodes_cost:
                 best_nodes_cost = max(calculated_nodes_cost)
                 best_nodes = calculated_nodes
                 nIterationsNoImprovement=0
         else:
             nIterationsNoImprovement += 1
-            print("No improvement in ", nIterationsNoImprovement, "iterations")
             if nIterationsNoImprovement==maxIterationsNoImprovement:
                 stoppingCriterion=True
                 break
@@ -656,6 +641,28 @@ for vehicle in best_nodes:
 
 for vehicle in customers:
     print(vehicle)
+
+nodes_allocated = []
+for node in nodes:
+    allocated = False
+    for vehicle in customers:
+        for node_allocated in vehicle:
+            if node['id'] == node_allocated:
+                allocated = True
+                if node_allocated != 0:
+                    nodes_allocated.append(node_allocated)
+    if(allocated=="False"):
+        print("Missing node:", node)
+    
+if len(nodes_allocated)>len(set(nodes_allocated)):
+    print("Repeated values")
+
+end = time.time()
+print(end - start)
+#execution time: 0.9477388858795166
+
+
+
 
 
 
