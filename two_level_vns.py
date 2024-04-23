@@ -407,7 +407,7 @@ def inter_relocate_nodes_vehicle(allocated_nodes):
             if(allocated_nodes[idx2][0]!=allocated_nodes[idx2][-1]):
                 allocated_nodes[idx2].append(allocated_nodes[idx2][0])
             while allocated_nodes[idx2][idx]["Cluster"] == allocated_nodes[idx2][idx+1]['Cluster']:
-                if idx < len(allocated_nodes[idx2]) - 1:
+                if idx < len(allocated_nodes[idx2]) - 2:
                     idx += 1
             indices1 = [idx for idx, elem in enumerate(allocated_nodes[idx1]) if elem['Cluster'] == cluster]
             relocated_elements = []

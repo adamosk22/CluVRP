@@ -1,3 +1,4 @@
+import math
 import xml.etree.ElementTree as ET
 import numpy as np
 import sys
@@ -186,6 +187,33 @@ def find_path(extracted_data):
             vehicle['Path'].append(paths[node][0])
         print(vehicle)
         i+=1
+    for vehicle in base_result:
+        distance = 0
+        i = 0
+        for cluster in vehicle['Path']:
+            j = 0
+            while j < len(cluster) - 1:
+                node1 = None
+                node2 = None
+                for node in extracted_data:
+                    if node['Addr'] == cluster[j]:
+                        node1 = node
+                    if node['Addr'] == cluster[j+1]:
+                        node2 = node
+                distance += euclidean_distance(node1, node2)
+                j += 1
+            if i < len(vehicle['Path']) - 1:
+                node1 = None
+                node2 = None
+                for node in extracted_data:
+                    if node['Addr'] == str(vehicle['Path'][i][-1]):
+                        node1 = node
+                    if node['Addr'] == str(vehicle['Path'][i+1][0]):
+                        node2 = node 
+                distance += euclidean_distance(node1, node2)
+            i+=1
+        print(distance)
+
         
 def find_coordinates(extracted_data, number):
     coordinates = []
@@ -198,8 +226,13 @@ def find_coordinates(extracted_data, number):
 def calculate_distance(coord1, coord2):
     x1, y1 = coord1
     x2, y2 = coord2
-    distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    return distance
+    calculated_distance = math.sqrt(pow((x2 - x1), 2) + pow((y2 - y1), 2))
+    return calculated_distance
+
+def euclidean_distance(point1, point2):
+    x1, y1 = point1['CoordX'], point1['CoordY']
+    x2, y2 = point2['CoordX'], point2['CoordY']
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 start = time.time()
 
