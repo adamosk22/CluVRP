@@ -351,8 +351,6 @@ def intra_2opt_nodes(allocated_nodes, idx1, cluster_number):
 
 def generate_clusters_route(clusters, position_values, vehicles):
     cluster_order = sorted(range(len(position_values)), key=lambda i: position_values[i], reverse=True)
-    print(position_values)
-    print(cluster_order)
     cluster_order.remove(0)
     i = 0
     for vehicle in vehicles:
@@ -377,9 +375,6 @@ def generate_clusters_route(clusters, position_values, vehicles):
 
 
         vehicle_index = min_insertion_cost_vehicle.index(min(min_insertion_cost_vehicle))
-        print(vehicles)
-        print(cluster)
-        print(min_insertion_cost_vehicle)
         while (vehicles[vehicle_index]['RemainingCapacity'] - clusters[cluster - 1]['TotalDemand']) < 0:
             min_insertion_cost_vehicle[vehicle_index] = float('inf')
             vehicle_index = min_insertion_cost_vehicle.index(min(min_insertion_cost_vehicle))
@@ -391,7 +386,6 @@ def generate_clusters_route(clusters, position_values, vehicles):
 
 def generate_customers_route(vehicles, nodes, position_values):
     node_order = sorted(range(len(position_values)), key=lambda i: position_values[i], reverse=True)
-    print(node_order)
     for vehicle in vehicles:
         vehicle['Path'].append([{'Addr': '0', 'id': 0, 'Cluster': 0, 'DemDelivery': 0, 'DemPickup': 0, 'CoordX': 499090, 'CoordY': 4792870}])
         for cluster in vehicle['Clusters']:
@@ -411,9 +405,6 @@ def generate_customers_route(vehicles, nodes, position_values):
                     min_insertion_position = None
                     initial_route_vehicle = vehicle['Path'][i].copy()
                     for position in range(len(initial_route_vehicle) + 1):
-                        print(initial_route_vehicle)
-                        print(node)
-                        print(cluster)
                         insertion_cost = calculate_insertion_cost_node(initial_route_vehicle, node, position)
                         if insertion_cost < min_insertion_cost:
                             min_insertion_cost = insertion_cost
@@ -424,7 +415,6 @@ def generate_customers_route(vehicles, nodes, position_values):
             distance = 0
             i = 0
             for cluster in vehicle['Path']:
-                print(cluster)
                 j = 0
                 while j < len(cluster) - 1:
                     distance += euclidean_distance(cluster[j], cluster[j+1])
@@ -432,7 +422,6 @@ def generate_customers_route(vehicles, nodes, position_values):
                 if i < len(vehicle['Path']) - 1:
                     distance += euclidean_distance(vehicle['Path'][i][-1], vehicle['Path'][i+1][0])
                 i += 1
-            print (distance)
     return vehicles
 
 def calculate_distance(vehicles):
@@ -469,14 +458,21 @@ def vns(s):
         s_initial = copy.deepcopy(s)
         NLc = [inter_shift1, inter_shift2, inter_swap11, inter_swap21, inter_swap22]
         NLc_full = [inter_shift1, inter_shift2, inter_swap11, inter_swap21, inter_swap22]
+        s_best = []
+        distances_best = [float('inf'), float('inf')]
         while len(NLc) != 0:
             neighbourhood = random.choice(NLc)
-            print(neighbourhood.__name__)
             s_copy = copy.deepcopy(s)
-            distances_before = calculate_distance(s)
+            for vehicle in s_copy:
+                for cluster in vehicle:
+                    print("vehicle", vehicle)
             neighbourhood(s_copy)
-            if(s_copy == s):
-                print('to samo')
+            for vehicle in s_copy:
+                clusters_vehicle = []
+                for cluster in vehicle:
+                    clusters_vehicle.append(cluster[0]['Cluster'])
+                if len(clusters_vehicle)!=(len(set(clusters_vehicle)) + 1) or clusters_vehicle[0]!=0 or clusters_vehicle[-1]!=0:
+                    s_copy = copy.deepcopy(s)
             len_s = 0
             len_s_copy = 0
             for vehicle in s:
@@ -486,26 +482,28 @@ def vns(s):
             if(len_s != len_s_copy):
                 print("pryczyna", neighbourhood.__name__)
             distances_after = calculate_distance(s_copy)
-            if max(distances_after) < max(distances_before):
-                print("after", distances_after)
+            if max(distances_after) < max(distances_best):
+                print("ulepszono")
                 s = copy.deepcopy(s_copy)
-                print("not searched", calculate_distance(s))
                 s = intra_route_search(s)
-                print("searched", calculate_distance(s))
+                s_best = copy.deepcopy(s_copy)
+                distances_best = distances_after
                 NLc = NLc_full.copy()
             else:
                 NLc.remove(neighbourhood)
-                print("rejected", distances_after)
-                print(distances_before)
+                print(distances_after)
+                print(NLc)
+        print(s)
         s = intra_cluster_search(s)
-    print("iteracje", i)
-    return s
+    return s_best
 
 def intra_route_search(s_vehicles):
     i = 0
     for s in s_vehicles:
         s_initial = copy.deepcopy(s)
         first_iterartion = True
+        distance_best = float('inf')
+        s_best_vehicle = []
         while calculate_distance_vehicle(s) < calculate_distance_vehicle(s_initial) or first_iterartion == True:
             first_iterartion = False
             s_initial = copy.deepcopy(s)
@@ -514,22 +512,27 @@ def intra_route_search(s_vehicles):
             while len(NLc) != 0:
                 neighbourhood = random.choice(NLc)
                 s_copy = copy.deepcopy(s_vehicles)
-                distance_before = calculate_distance_vehicle(s_vehicles[i])
                 l1 = len(s_vehicles[i])
                 neighbourhood(s_copy, i)
+                for vehicle in s_copy:
+                    clusters_vehicle = []
+                    for cluster in vehicle:
+                        clusters_vehicle.append(cluster[0]['Cluster'])
+                    if len(clusters_vehicle)!=(len(set(clusters_vehicle)) + 1) or clusters_vehicle[0]!=0 or clusters_vehicle[-1]!=0:
+                        s_copy = copy.deepcopy(s_vehicles)
                 l2 = len(s_copy[i])
                 if l1 != l2:
                     print('przyczyna', neighbourhood.__name__)
                 distance_after = calculate_distance_vehicle(s_copy[i])
-                if distance_after < distance_before:
+                if distance_after < distance_best:
                     s_vehicles = copy.deepcopy(s_copy)
                     s = copy.deepcopy(s_copy[i])
                     NLc = NLc_full
+                    s_best_vehicle = copy.deepcopy(s_copy[i])
+                    distance_best = distance_after
                 else:
                     NLc.remove(neighbourhood)
-                print('initial', calculate_distance_vehicle(s_initial))
-                print('new', calculate_distance_vehicle(s))
-                print("length", len(s))
+        s_vehicles[i] = s_best_vehicle
         i += 1
     return s_vehicles
 
@@ -538,26 +541,28 @@ def intra_cluster_search(s_vehicles):
     for s_vehicle in s_vehicles:
         j = 0
         for s in s_vehicle:
+            distance_best = float('inf')
+            s_best_cluster = []
             s_initial = copy.deepcopy(s)
             first_iterartion = True
-            while calculate_distance_cluster(s) < calculate_distance_cluster(s_initial) or first_iterartion == True:
+            while calculate_distance_cluster(s) < calculate_distance_cluster(s_best_cluster) or first_iterartion == True:
                 first_iterartion = False
                 NLc = [intra_2opt_nodes, intra_shift_nodes, intra_swap_nodes]
                 NLc_full = [intra_2opt_nodes, intra_shift_nodes, intra_swap_nodes]
                 while len(NLc) != 0:
                     neighbourhood = random.choice(NLc)
-                    s_copy = copy.deepcopy(s_vehicles)
-                    distance_before = calculate_distance_cluster(s_vehicles[i][j])
+                    s_copy = [x[:] for x in s_vehicles]
                     neighbourhood(s_copy, i, j)
                     distance_after = calculate_distance_cluster(s_copy[i][j])
-                    if distance_after < distance_before:
-                        s_vehicles = copy.deepcopy(s_copy)
-                        s = copy.deepcopy(s_copy[i][j])
+                    if distance_after < distance_best:
+                        s_vehicles = [x[:] for x in s_copy]
+                        s = copy.copy(s_copy[i][j])
+                        s_best_cluster = copy.copy(s_copy[i][j])
                         NLc = NLc_full
-                        print("before", distance_before)
-                        print("after", distance_after)
+                        distance_best = distance_after
                     else:
                         NLc.remove(neighbourhood)
+            s_vehicles[i][j] = s_best_cluster
             j += 1
         i += 1
     return s_vehicles
@@ -621,30 +626,39 @@ fg = float('inf')
 #main phase
 clusters = create_clusters_table(nodes)
 full_demand = 0
-vehicles = []
 for cluster in clusters:
     full_demand += cluster['TotalDemand']
 number_of_vehicles = full_demand/vehicle_capacity
 print(number_of_vehicles)
+s_best = []
+distances_best = [float('inf'), float('inf')]
 i = 0
-while i < number_of_vehicles:
-    vehicles.append({"Clusters": [], "RemainingCapacity": vehicle_capacity, "Path": []})
+while i < len(Y):
+    vehicles = []
+    j = 0
+    while j < number_of_vehicles:
+        vehicles.append({"Clusters": [], "RemainingCapacity": vehicle_capacity, "Path": []})
+        j += 1
+    print("ite", i)
+    vehicles = generate_clusters_route(clusters, Y[i], vehicles)
+    vehicles = generate_customers_route(vehicles, nodes, X[i])
+    allocated_nodes = []
+    for vehicle in vehicles:
+        allocated_nodes.append(vehicle['Path'])
+    distance_before = calculate_distance(allocated_nodes)
+    print("before", distance_before)
+    s = vns(allocated_nodes)
+    print("after", calculate_distance(s))
+    if max(calculate_distance(s)) < max(distances_best):
+        s_best = copy.deepcopy(s)
+        distances_best = calculate_distance(s)
+        print("new", distances_best)
     i += 1
-vehicles = generate_clusters_route(clusters, Y[0], vehicles)
-vehicles = generate_customers_route(vehicles, nodes, X[0])
-allocated_nodes = []
-for vehicle in vehicles:
-    allocated_nodes.append(vehicle['Path'])
-for vehicle in allocated_nodes:
-    print(len(vehicle))
-distance_before = calculate_distance(allocated_nodes)
-s = vns(allocated_nodes)
-for vehicle in allocated_nodes:
+for vehicle in s_best:
     for cluster in vehicle:
         print(cluster[0]['Cluster'])
-print("nodes", allocated_nodes)
-print(calculate_distance(allocated_nodes))
-print(distance_before)
+print("nodes", s_best)
+print(distances_best)
 
 
 
