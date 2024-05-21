@@ -1,5 +1,9 @@
 import copy
 import math
+import os
+import statistics
+import sys
+import time
 import xml.etree.ElementTree as ET
 import random
 
@@ -65,16 +69,21 @@ def calculate_inter_cluster_distances(data):
     cluster_coords = {cluster_id: [] for cluster_id in range(n_clusters)}
 
     # Zbieranie współrzędnych punktów dla każdego klastra
+    i = 0
     for node in data:
         cluster_coords[node['Cluster']].append({'CoordX': node['CoordX'], 'CoordY': node['CoordY']})
 
     # Obliczanie najkrótszych odległości między klastrami
-    inter_cluster_distances = [[float('inf')] * n_clusters for _ in range(n_clusters)]
+    inter_cluster_distances = [[math.inf] * n_clusters for _ in range(n_clusters)]
     for i in range(n_clusters):
         for j in range(i + 1, n_clusters):
-            min_dist = min(euclidean_distance(p1, p2) for p1 in cluster_coords[i] for p2 in cluster_coords[j])
-            inter_cluster_distances[i][j] = min_dist
-            inter_cluster_distances[j][i] = min_dist
+            if cluster_coords[i] != [] and cluster_coords[j] != []:
+                min_dist = min(euclidean_distance(p1, p2) for p1 in cluster_coords[i] for p2 in cluster_coords[j])
+                inter_cluster_distances[i][j] = min_dist
+                inter_cluster_distances[j][i] = min_dist
+            else:
+                inter_cluster_distances[i][j] = 0
+                inter_cluster_distances[j][i] = 0
     
     return inter_cluster_distances
 
@@ -108,94 +117,99 @@ def insert_node(route, node, position):
 def inter_shift1(allocated_nodes):
     if len(vehicles) >= 2:
         idx1, idx2 = random.sample(range(len(vehicles)), 2)
-        cluster = random.choice(allocated_nodes[idx1])
-        demand = clusters[cluster[0]['Cluster'] - 1]['TotalDemand']
-        capacity = vehicles[idx2]['RemainingCapacity'] - demand
-        if cluster[0]['Cluster'] != 0 and capacity > 0:
-            idx = random.randint(1, len(allocated_nodes[idx2]) - 2)
-            allocated_nodes[idx2].insert(idx, cluster)
-            allocated_nodes[idx1].remove(cluster)
-            vehicles[idx1]['RemainingCapacity'] += demand
-            vehicles[idx2]['RemainingCapacity'] -= demand
+        if len(allocated_nodes[idx1])>3 and len(allocated_nodes[idx2])>3:
+            cluster = random.choice(allocated_nodes[idx1])
+            demand = clusters[cluster[0]['Cluster'] - 1]['TotalDemand']
+            capacity = vehicles[idx2]['RemainingCapacity'] - demand
+            if cluster[0]['Cluster'] != 0 and capacity > 0:
+                idx = random.randint(1, len(allocated_nodes[idx2]) - 2)
+                allocated_nodes[idx2].insert(idx, cluster)
+                allocated_nodes[idx1].remove(cluster)
+                vehicles[idx1]['RemainingCapacity'] += demand
+                vehicles[idx2]['RemainingCapacity'] -= demand
 
 def inter_shift2(allocated_nodes):
      if len(vehicles) >= 2:
         idx1, idx2 = random.sample(range(len(vehicles)), 2)
-        i = random.randrange(1, len(allocated_nodes[idx1])-2)
-        cluster1 = allocated_nodes[idx1][i]
-        cluster2 = allocated_nodes[idx1][i+1]
-        demand = clusters[cluster1[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
-        capacity = vehicles[idx2]['RemainingCapacity'] - demand
-        if cluster1[0]['Cluster'] != 0 and cluster2[0]['Cluster'] != 0 and capacity > 0:
-            idx = random.randint(1, len(allocated_nodes[idx2]) - 2)
-            allocated_nodes[idx2].insert(idx, cluster1)
-            allocated_nodes[idx2].insert(idx + 1, cluster2)
-            allocated_nodes[idx1].remove(cluster1)
-            allocated_nodes[idx1].remove(cluster2)
-            vehicles[idx1]['RemainingCapacity'] += demand
-            vehicles[idx2]['RemainingCapacity'] -= demand
+        if len(allocated_nodes[idx1])>3 and len(allocated_nodes[idx2])>3:
+            i = random.randrange(1, len(allocated_nodes[idx1])-2)
+            cluster1 = allocated_nodes[idx1][i]
+            cluster2 = allocated_nodes[idx1][i+1]
+            demand = clusters[cluster1[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
+            capacity = vehicles[idx2]['RemainingCapacity'] - demand
+            if cluster1[0]['Cluster'] != 0 and cluster2[0]['Cluster'] != 0 and capacity > 0:
+                idx = random.randint(1, len(allocated_nodes[idx2]) - 2)
+                allocated_nodes[idx2].insert(idx, cluster1)
+                allocated_nodes[idx2].insert(idx + 1, cluster2)
+                allocated_nodes[idx1].remove(cluster1)
+                allocated_nodes[idx1].remove(cluster2)
+                vehicles[idx1]['RemainingCapacity'] += demand
+                vehicles[idx2]['RemainingCapacity'] -= demand
 
 
 def inter_swap11(allocated_nodes):
 # Operator Swap: zamienia pojazd dla dwóch klastrów
     if len(allocated_nodes) >= 2:
         idx1, idx2 = random.sample(range(len(vehicles)), 2)
-        i = random.randrange(1, len(allocated_nodes[idx1])-2)
-        cluster1 = allocated_nodes[idx1][i]
-        j = random.randrange(1, len(allocated_nodes[idx2])-2)
-        cluster2 = allocated_nodes[idx2][j]
-        demand1 = clusters[cluster1[0]['Cluster'] - 1]['TotalDemand']
-        demand2 = clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
-        capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
-        capacity2 = vehicles[idx2]['RemainingCapacity'] + demand2 - demand1
-        if (capacity1 > 0) and (capacity2 > 0):
-            allocated_nodes[idx1][i] = cluster2
-            allocated_nodes[idx2][j] = cluster1
-            vehicles[idx1]['RemainingCapacity'] = capacity1
-            vehicles[idx2]['RemainingCapacity'] = capacity2
+        if len(allocated_nodes[idx1])>3 and len(allocated_nodes[idx2])>3:
+            i = random.randrange(1, len(allocated_nodes[idx1])-2)
+            cluster1 = allocated_nodes[idx1][i]
+            j = random.randrange(1, len(allocated_nodes[idx2])-2)
+            cluster2 = allocated_nodes[idx2][j]
+            demand1 = clusters[cluster1[0]['Cluster'] - 1]['TotalDemand']
+            demand2 = clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
+            capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
+            capacity2 = vehicles[idx2]['RemainingCapacity'] + demand2 - demand1
+            if (capacity1 > 0) and (capacity2 > 0):
+                allocated_nodes[idx1][i] = cluster2
+                allocated_nodes[idx2][j] = cluster1
+                vehicles[idx1]['RemainingCapacity'] = capacity1
+                vehicles[idx2]['RemainingCapacity'] = capacity2
 
 def inter_swap21(allocated_nodes):
 # Operator Swap: zamienia pojazd dla dwóch klastrów
     if len(allocated_nodes) >= 2:
         idx1, idx2 = random.sample(range(len(vehicles)), 2)
-        i = random.randrange(1, len(allocated_nodes[idx1])-2)
-        cluster11 = allocated_nodes[idx1][i]
-        cluster12 = allocated_nodes[idx1][i+1]
-        j = random.randrange(1, len(allocated_nodes[idx2])-2)
-        cluster2 = allocated_nodes[idx2][j]
-        demand1 = clusters[cluster11[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster12[0]['Cluster'] - 1]['TotalDemand']
-        demand2 = clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
-        capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
-        capacity2 = vehicles[idx1]['RemainingCapacity'] + demand2 - demand1
-        if (capacity1 > 0) and (capacity2 > 0):
-            allocated_nodes[idx1][i] = cluster2
-            allocated_nodes[idx2][j] = cluster11
-            allocated_nodes[idx1].remove(cluster12)
-            allocated_nodes[idx2].insert(j+1, cluster12)
-            vehicles[idx1]['RemainingCapacity'] = capacity1
-            vehicles[idx2]['RemainingCapacity'] = capacity2
+        if len(allocated_nodes[idx1])>3 and len(allocated_nodes[idx2])>3:
+            i = random.randrange(1, len(allocated_nodes[idx1])-2)
+            cluster11 = allocated_nodes[idx1][i]
+            cluster12 = allocated_nodes[idx1][i+1]
+            j = random.randrange(1, len(allocated_nodes[idx2])-2)
+            cluster2 = allocated_nodes[idx2][j]
+            demand1 = clusters[cluster11[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster12[0]['Cluster'] - 1]['TotalDemand']
+            demand2 = clusters[cluster2[0]['Cluster'] - 1]['TotalDemand']
+            capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
+            capacity2 = vehicles[idx1]['RemainingCapacity'] + demand2 - demand1
+            if (capacity1 > 0) and (capacity2 > 0):
+                allocated_nodes[idx1][i] = cluster2
+                allocated_nodes[idx2][j] = cluster11
+                allocated_nodes[idx1].remove(cluster12)
+                allocated_nodes[idx2].insert(j+1, cluster12)
+                vehicles[idx1]['RemainingCapacity'] = capacity1
+                vehicles[idx2]['RemainingCapacity'] = capacity2
 
 def inter_swap22(allocated_nodes):
 # Operator Swap: zamienia pojazd dla dwóch klastrów
     if len(allocated_nodes) >= 2:
         idx1, idx2 = random.sample(range(len(vehicles)), 2)
-        i = random.randrange(1, len(allocated_nodes[idx1])-2)
-        cluster11 = allocated_nodes[idx1][i]
-        cluster12 = allocated_nodes[idx1][i+1]
-        j = random.randrange(1, len(allocated_nodes[idx2])-2)
-        cluster21 = allocated_nodes[idx2][j]
-        cluster22 = allocated_nodes[idx2][j+1]
-        demand1 = clusters[cluster11[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster12[0]['Cluster'] - 1]['TotalDemand']
-        demand2 = clusters[cluster21[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster22[0]['Cluster'] - 1]['TotalDemand']
-        capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
-        capacity2 = vehicles[idx1]['RemainingCapacity'] + demand2 - demand1
-        if (capacity1 > 0) and (capacity2 > 0):
-            allocated_nodes[idx1][i] = cluster21
-            allocated_nodes[idx2][j] = cluster11
-            allocated_nodes[idx1][i+1] = cluster22
-            allocated_nodes[idx2][j+1] = cluster12
-            vehicles[idx1]['RemainingCapacity'] = capacity1
-            vehicles[idx2]['RemainingCapacity'] = capacity2
+        if len(allocated_nodes[idx1])>3 and len(allocated_nodes[idx2])>3:
+            i = random.randrange(1, len(allocated_nodes[idx1])-2)
+            cluster11 = allocated_nodes[idx1][i]
+            cluster12 = allocated_nodes[idx1][i+1]
+            j = random.randrange(1, len(allocated_nodes[idx2])-2)
+            cluster21 = allocated_nodes[idx2][j]
+            cluster22 = allocated_nodes[idx2][j+1]
+            demand1 = clusters[cluster11[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster12[0]['Cluster'] - 1]['TotalDemand']
+            demand2 = clusters[cluster21[0]['Cluster'] - 1]['TotalDemand'] + clusters[cluster22[0]['Cluster'] - 1]['TotalDemand']
+            capacity1 = vehicles[idx1]['RemainingCapacity'] + demand1 - demand2
+            capacity2 = vehicles[idx1]['RemainingCapacity'] + demand2 - demand1
+            if (capacity1 > 0) and (capacity2 > 0):
+                allocated_nodes[idx1][i] = cluster21
+                allocated_nodes[idx2][j] = cluster11
+                allocated_nodes[idx1][i+1] = cluster22
+                allocated_nodes[idx2][j+1] = cluster12
+                vehicles[idx1]['RemainingCapacity'] = capacity1
+                vehicles[idx2]['RemainingCapacity'] = capacity2
 
 def inter_2_opt(allocated_nodes):
     if len(allocated_nodes) >= 2:
@@ -245,13 +259,14 @@ def intra_shift1(allocated_nodes, idx1):
         allocated_nodes[idx1].insert(idx, cluster)
 
 def intra_swap(allocated_nodes, idx1):
-    i = random.randrange(len(allocated_nodes[idx1])-2)
-    cluster1 = allocated_nodes[idx1][i]
-    j = random.randrange(len(allocated_nodes[idx1])-2)
-    cluster2 = allocated_nodes[idx1][j]
-    if cluster1[0]['Cluster'] != 0 and cluster2[0]['Cluster'] != 0:
-        allocated_nodes[idx1][i] = cluster2
-        allocated_nodes[idx1][j] = cluster1
+    if len(allocated_nodes[idx1])>3:
+        i = random.randrange(len(allocated_nodes[idx1])-2)
+        cluster1 = allocated_nodes[idx1][i]
+        j = random.randrange(len(allocated_nodes[idx1])-2)
+        cluster2 = allocated_nodes[idx1][j]
+        if cluster1[0]['Cluster'] != 0 and cluster2[0]['Cluster'] != 0:
+            allocated_nodes[idx1][i] = cluster2
+            allocated_nodes[idx1][j] = cluster1
 
 def intra_or_opt2(allocated_nodes, idx1):
     if len(allocated_nodes[idx1]) > 4:
@@ -329,7 +344,7 @@ def intra_swap_nodes(allocated_nodes, idx1, cluster_number):
 
 def intra_2opt_nodes(allocated_nodes, idx1, cluster_number):
     cluster = allocated_nodes[idx1][cluster_number]
-    if cluster[0]['id'] != 0:
+    if cluster[0]['id'] != 0 and len(cluster)>5:
         i = random.randrange(len(cluster)-2)
         node11 = cluster[i]
         node12 = cluster[i+1]
@@ -412,6 +427,9 @@ def generate_customers_route(vehicles, nodes, position_values):
                     vehicle['Path'][i] = insert_node(vehicle['Path'][i], node, min_insertion_position)
                 i += 1
     for vehicle in vehicles:
+            for cluster in vehicle['Path']:
+                if cluster == []:
+                    vehicle['Path'].remove(cluster)
             distance = 0
             i = 0
             for cluster in vehicle['Path']:
@@ -463,9 +481,6 @@ def vns(s):
         while len(NLc) != 0:
             neighbourhood = random.choice(NLc)
             s_copy = copy.deepcopy(s)
-            for vehicle in s_copy:
-                for cluster in vehicle:
-                    print("vehicle", vehicle)
             neighbourhood(s_copy)
             for vehicle in s_copy:
                 clusters_vehicle = []
@@ -473,17 +488,8 @@ def vns(s):
                     clusters_vehicle.append(cluster[0]['Cluster'])
                 if len(clusters_vehicle)!=(len(set(clusters_vehicle)) + 1) or clusters_vehicle[0]!=0 or clusters_vehicle[-1]!=0:
                     s_copy = copy.deepcopy(s)
-            len_s = 0
-            len_s_copy = 0
-            for vehicle in s:
-                len_s += len(vehicle)
-            for vehicle in s_copy:
-                len_s_copy += len(vehicle)
-            if(len_s != len_s_copy):
-                print("pryczyna", neighbourhood.__name__)
             distances_after = calculate_distance(s_copy)
             if max(distances_after) < max(distances_best):
-                print("ulepszono")
                 s = copy.deepcopy(s_copy)
                 s = intra_route_search(s)
                 s_best = copy.deepcopy(s_copy)
@@ -491,11 +497,11 @@ def vns(s):
                 NLc = NLc_full.copy()
             else:
                 NLc.remove(neighbourhood)
-                print(distances_after)
-                print(NLc)
-        print(s)
         s = intra_cluster_search(s)
-    return s_best
+    if max(calculate_distance(s_initial)) > max(calculate_distance(s_best)):
+        return s_best
+    else:
+        return s_initial
 
 def intra_route_search(s_vehicles):
     i = 0
@@ -520,9 +526,6 @@ def intra_route_search(s_vehicles):
                         clusters_vehicle.append(cluster[0]['Cluster'])
                     if len(clusters_vehicle)!=(len(set(clusters_vehicle)) + 1) or clusters_vehicle[0]!=0 or clusters_vehicle[-1]!=0:
                         s_copy = copy.deepcopy(s_vehicles)
-                l2 = len(s_copy[i])
-                if l1 != l2:
-                    print('przyczyna', neighbourhood.__name__)
                 distance_after = calculate_distance_vehicle(s_copy[i])
                 if distance_after < distance_best:
                     s_vehicles = copy.deepcopy(s_copy)
@@ -532,7 +535,10 @@ def intra_route_search(s_vehicles):
                     distance_best = distance_after
                 else:
                     NLc.remove(neighbourhood)
-        s_vehicles[i] = s_best_vehicle
+        if calculate_distance_vehicle(s_initial) > distance_best:
+            s_vehicles[i] = s_best_vehicle
+        else:
+            s_vehicles[i] = s_initial
         i += 1
     return s_vehicles
 
@@ -562,7 +568,10 @@ def intra_cluster_search(s_vehicles):
                         distance_best = distance_after
                     else:
                         NLc.remove(neighbourhood)
-            s_vehicles[i][j] = s_best_cluster
+            if calculate_distance_cluster(s_initial) > calculate_distance_cluster(s_best_cluster):
+                s_vehicles[i][j] = s_best_cluster
+            else:
+                s_vehicles[i][j] = s_initial
             j += 1
         i += 1
     return s_vehicles
@@ -572,93 +581,147 @@ def intra_cluster_search(s_vehicles):
 
 
 
+start = time.time()
 w = 0.7
 c1 = c2 = 2
-r1 = r2 = 0.5
+r1 = random.uniform(0,1)
+r2 = random.uniform(0,1)
 alfa_max = beta_max = gamma_max = delta_max = 4
 alfa_min = beta_min = gamma_min = delta_min = -4
-vehicle_capacity = 600
+vehicle_capacity = 550
+times = []
+costs = []
+if __name__ == "__main__":
+    w = float(sys.argv[1])
+    c1 = float(sys.argv[2])
+    c2 = c1
+    r1 = float(sys.argv[3])
+    r2 = r1
 
-xml_file_path = 'dataset.xml'
-nodes = extract_data_from_xml(xml_file_path)
-inter_cluster_distances = calculate_inter_cluster_distances(nodes)
-n = len(nodes)
-c = 0
-current_cluster = -1
-for node in nodes:
-    if current_cluster != node['Cluster']:
-        current_cluster = node['Cluster']
-        c += 1
+folder_path = 'instances'
+files = os.listdir(folder_path)
+for file_name in files:
+    if file_name.endswith('.xml'):
+        start = time.time()
+        print(file_name)
+        file_path = os.path.join(folder_path, file_name)
+        nodes = extract_data_from_xml(file_path)
+        inter_cluster_distances = calculate_inter_cluster_distances(nodes)
+        n = len(nodes)
+        c = 0
+        current_cluster = -1
+        for node in nodes:
+            if current_cluster != node['Cluster']:
+                current_cluster = node['Cluster']
+                c += 1
+        
+        K = n/4
+        X = []
+        Y = []
+        U = []
+        V = []
+        fb = []
+        fb_index = 0
+        i = 0
+        while i < K:
+            X_row = []
+            Y_row = [] 
+            U_row = [] 
+            V_row = []
+            j = 0
+            while j < n:
+                gamma_i_l = gamma_min + (gamma_max - gamma_min)*random.uniform(0,1)
+                X_row.append(gamma_i_l)
+                delta_i_l = delta_min + (delta_max - delta_min)*random.uniform(0,1)
+                U_row.append(delta_i_l)
+                j+=1
+            j = 0
+            while j < c:
+                alfa_i_l = alfa_min + (alfa_max - alfa_min)*random.uniform(0,1)
+                Y_row.append(alfa_i_l)
+                beta_i_l = beta_min + (beta_max - beta_min)*random.uniform(0,1)
+                V_row.append(beta_i_l)
+                j+=1
+            X.append(X_row)
+            Y.append(Y_row)
+            U.append(U_row)
+            V.append(V_row)
+            fb.append(0)
+            i+=1
+        fg = 0
+        #main phase
+        clusters = create_clusters_table(nodes)
+        full_demand = 0
+        for cluster in clusters:
+            full_demand += cluster['TotalDemand']
+        number_of_vehicles = full_demand/vehicle_capacity
+        s_best = []
+        distances_best = [float('inf'), float('inf')]
+        i = 0
+        while i < len(Y):
+            vehicles = []
+            j = 0
+            while j < number_of_vehicles:
+                vehicles.append({"Clusters": [], "RemainingCapacity": vehicle_capacity, "Path": []})
+                j += 1
+            vehicles = generate_clusters_route(clusters, Y[i], vehicles)
+            vehicles = generate_customers_route(vehicles, nodes, X[i])
+            allocated_nodes = []
+            for vehicle in vehicles:
+                allocated_nodes.append(vehicle['Path'])
+            distance_before = calculate_distance(allocated_nodes)
+            s = vns(allocated_nodes)
+            fb[i] = max(calculate_distance(s))
+            fg = max(fb)
+            if fb[i]==fg:
+                fb_index = i
+            if max(calculate_distance(s)) < max(distances_best):
+                s_best = copy.deepcopy(s)
+                distances_best = calculate_distance(s)
+            j = 0
+            for V_row in V:
+                k = 0
+                for delta_il in V_row:
+                    delta_il = w * delta_il + c1*r1*(Y[fb_index][k]-Y[j][k]) + c2*r2*(max(Y[fb_index])-Y[j][k])
+                    V[j][k] = delta_il 
+                    Y[j][k] += delta_i_l
+                    k += 1
+                j += 1
+                k = 0
+            j = 0
+            for U_row in U:
+                k = 0
+                for beta_il in U_row:
+                    beta_il = w * beta_il + c1*r1*(X[fb_index][k]-X[j][k]) + c2*r2*(max(X[fb_index])-X[j][k])
+                    U[j][k] = beta_il
+                    X[j][k] += beta_i_l
+                    k += 1
+                j += 1
+                k = 0
+            i += 1
+        for vehicle in s_best:
+            for cluster in vehicle:
+                print(cluster[0]['Cluster'])
+        print("nodes", s_best)
+        print(distances_best)
+        for vehicle in s_best:
+            for cluster in vehicle:
+                cluster_number = cluster[0]['Cluster']
+                if cluster_number != 0:
+                    if len(cluster) != 10 and len(cluster) != 8 and len(cluster) != 5:
+                        print("incorrect length of cluster", cluster_number)
+                    for node in cluster:
+                        if node['Cluster'] != cluster_number:
+                            print("Cluster not matching", node, cluster)
+        end = time.time()
+        print("execution time", end - start)
+        times.append(end-start)
+        costs.append(max(distances_best))
 
-K = n/4
-X = []
-Y = []
-U = []
-V = []
-fb = []
-i = 0
-while i < K:
-    X_row = []
-    Y_row = [] 
-    U_row = [] 
-    V_row = []
-    j = 0
-    while j < n:
-        gamma_i_l = gamma_min + (gamma_max - gamma_min)*random.uniform(0,1)
-        X_row.append(gamma_i_l)
-        beta_i_l = beta_min + (beta_max - beta_min)*random.uniform(0,1)
-        U_row.append(beta_i_l)
-        j+=1
-    j = 0
-    while j < c:
-        alfa_i_l = alfa_min + (alfa_max - alfa_min)*random.uniform(0,1)
-        Y_row.append(alfa_i_l)
-        delta_i_l = delta_min + (delta_max - delta_min)*random.uniform(0,1)
-        V_row.append(delta_i_l)
-        j+=1
-    X.append(X_row)
-    Y.append(Y_row)
-    U.append(U_row)
-    V.append(V_row)
-    fb.append(float('inf'))
-    i+=1
-fg = float('inf')
-#main phase
-clusters = create_clusters_table(nodes)
-full_demand = 0
-for cluster in clusters:
-    full_demand += cluster['TotalDemand']
-number_of_vehicles = full_demand/vehicle_capacity
-print(number_of_vehicles)
-s_best = []
-distances_best = [float('inf'), float('inf')]
-i = 0
-while i < len(Y):
-    vehicles = []
-    j = 0
-    while j < number_of_vehicles:
-        vehicles.append({"Clusters": [], "RemainingCapacity": vehicle_capacity, "Path": []})
-        j += 1
-    print("ite", i)
-    vehicles = generate_clusters_route(clusters, Y[i], vehicles)
-    vehicles = generate_customers_route(vehicles, nodes, X[i])
-    allocated_nodes = []
-    for vehicle in vehicles:
-        allocated_nodes.append(vehicle['Path'])
-    distance_before = calculate_distance(allocated_nodes)
-    print("before", distance_before)
-    s = vns(allocated_nodes)
-    print("after", calculate_distance(s))
-    if max(calculate_distance(s)) < max(distances_best):
-        s_best = copy.deepcopy(s)
-        distances_best = calculate_distance(s)
-        print("new", distances_best)
-    i += 1
-for vehicle in s_best:
-    for cluster in vehicle:
-        print(cluster[0]['Cluster'])
-print("nodes", s_best)
-print(distances_best)
+print(times)
+print(costs)
+print(statistics.mean(times))
+print(statistics.mean(costs))
 
 
 

@@ -1,4 +1,6 @@
 import math
+import os
+import statistics
 import xml.etree.ElementTree as ET
 import numpy as np
 import sys
@@ -141,7 +143,7 @@ def tsp_nearest_neighbor_global(coordinates, vehicles, clusters):
         vehicle['Path'].append(start_node)
         vehicle_number += 1
 
-    return vehicles, total_distance
+    return vehicles
 
 def find_path(extracted_data):
     paths = []
@@ -162,7 +164,7 @@ def find_path(extracted_data):
             cluster_coordinates = find_coordinates(extracted_data, cluster_number)
             if node['Cluster'] != 0:
                 cluster_path = tsp_nearest_neighbor(cluster_coordinates, cluster_number)
-                if(len(cluster_path[0]) != 10):
+                if(len(cluster_path[0]) != 10 and len(cluster_path[0]) != 8 and len(cluster_path[0]) != 5):
                     print("Nodes missing")
                     print(cluster_path)
                 paths.append(cluster_path)
@@ -173,20 +175,19 @@ def find_path(extracted_data):
     for path in paths:
         base_coordinates.append([path[3], path[2]])
         base_coordinates.append([path[4], path[2]])
-    base_result, base_distance = tsp_nearest_neighbor_global(base_coordinates, vehicles, clusters)
+    base_result = tsp_nearest_neighbor_global(base_coordinates, vehicles, clusters)
     i = 0
     for vehicle in base_result:
         base_path = vehicle['Clusters']
-        distance = base_distance[i]
-        for path in paths:
-            if path[2] in vehicle['Clusters']:
-                distance += path[1]
-        print("Distance:", distance)
         vehicle['Path'] = []
+        print(paths)
+        print(base_path)
         for node in base_path:
-            vehicle['Path'].append(paths[node][0])
-        print(vehicle)
+            for path in paths:
+                if path[2] == node:
+                    vehicle['Path'].append(path[0])
         i+=1
+    distances = []
     for vehicle in base_result:
         distance = 0
         i = 0
@@ -213,6 +214,8 @@ def find_path(extracted_data):
                 distance += euclidean_distance(node1, node2)
             i+=1
         print(distance)
+        distances.append(distance)
+    return distances
 
         
 def find_coordinates(extracted_data, number):
@@ -234,18 +237,30 @@ def euclidean_distance(point1, point2):
     x2, y2 = point2['CoordX'], point2['CoordY']
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-start = time.time()
+folder_path = 'instances_shortened'
+files = os.listdir(folder_path)
+times = []
+costs = []
+for file_name in files:
+    if file_name.endswith('.xml'):
+        start = time.time()
+        print(file_name)
+        file_path = os.path.join(folder_path, file_name)
 
-xml_file_path = 'dataset.xml'
+        extracted_data = extract_data_from_xml(file_path)
 
-extracted_data = extract_data_from_xml(xml_file_path)
+        vehicle_capacity = 500
 
-vehicle_capacity = 500
+        cost = find_path(extracted_data)
 
-find_path(extracted_data)
-
-end = time.time()
-print('exexution time', end - start)
+        end = time.time()
+        print('exexution time', end - start)
+        times.append(end - start)
+        costs.append(max(cost))
+print(times)
+print(costs)
+print(statistics.mean(times))
+print(statistics.mean(costs))
 
 
 #exexution time 0.003947257995605469
